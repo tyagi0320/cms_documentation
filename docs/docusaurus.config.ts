@@ -9,7 +9,7 @@ const config: Config = {
   favicon: 'img/favicon.ico',
 
   url: 'https://ChitwanRana.github.io',         
-  baseUrl: '/Content-Management-System-/',       
+  baseUrl: '/',       
   organizationName: 'ChitwanRana',              
   projectName: 'Content-Management-System',
   trailingSlash: false,
