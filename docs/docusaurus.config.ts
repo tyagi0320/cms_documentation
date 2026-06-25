@@ -8,7 +8,7 @@ const config: Config = {
   tagline: 'Full‑stack Content Management System',
   favicon: 'img/favicon.ico',
 
-  url: 'https://ChitwanRana.github.io',         
+  url: 'https://cms-documentation.onrender.com',         
   baseUrl: '/',       
   organizationName: 'ChitwanRana',              
   projectName: 'Content-Management-System',
