@@ -1,0 +1,227 @@
+---
+title: Authentication & Security
+sidebar_position: 2
+description: Complete authentication architecture – JWT, OTP, refresh tokens, Google OAuth, cookie security, and Redis-based rate limiting.
+---
+
+# Authentication & Security
+
+The CMS Platform uses a **JWT‑based authentication system** with a dual‑token strategy (access + refresh) to balance security and user experience. All sensitive operations are protected by **rate limiting**, **secure cookies**, and **Argon2 password hashing**.
+
+---
+
+## Authentication Architecture
+
+| Aspect | Implementation |
+|--------|----------------|
+| **Protocol** | JWT (JSON Web Tokens) |
+| **Access Token** | Short‑lived (30 minutes), stored **only in RAM** on the frontend |
+| **Refresh Token** | Long‑lived (7 days), stored in **HttpOnly, Secure, SameSite cookie** |
+| **Password Hashing** | Argon2 (via `passlib`) |
+| **OTP Storage** | Redis, TTL 5 minutes (registration) or 10 minutes (password reset) |
+| **Rate Limiting** | Redis‑based fixed‑window counters |
+| **Social Login** | Google OAuth 2.0 (ID token verification) |
+
+---
+
+## Registration & OTP Verification Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Client as React Client
+    participant Backend as FastAPI
+    participant Redis as Redis
+    participant Email as SMTP
+    participant DB as PostgreSQL
+
+    User->>Client: Fill registration form
+    Client->>Backend: POST /auth/register
+    Backend->>DB: Check email exists
+    Backend->>Backend: Hash password (Argon2)
+    Backend->>DB: Create user (is_verified=false)
+    Backend->>Redis: Store OTP (key: otp:{email}, ttl=300s)
+    Backend->>Email: Send OTP (background task)
+    Backend-->>Client: 201 Created
+
+    User->>Client: Enter OTP
+    Client->>Backend: POST /auth/verify-otp
+    Backend->>Redis: Retrieve OTP
+    alt OTP matches
+        Backend->>DB: Mark user.is_verified=true
+        Backend->>DB: Create welcome notification
+        Backend-->>Client: Success
+    else OTP invalid/expired
+        Backend-->>Client: 400 Invalid OTP
+    end
+```
+
+### Key Points
+
+* OTP is generated as a random **6-digit number**
+* Rate limiting on registration: **50 attempts per hour per email**
+* OTP is sent via email using a **Jinja2 template**
+* Welcome notification is created only after successful verification
+
+---
+
+## Login & Token Issuance
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Client as React Client
+    participant Backend as FastAPI
+    participant DB as PostgreSQL
+    participant Redis as Redis
+
+    User->>Client: Enter credentials
+    Client->>Backend: POST /auth/login
+    Backend->>DB: Find user by email
+    Backend->>Backend: Verify password (Argon2)
+    Backend->>DB: Check is_verified & suspension
+
+    alt Valid credentials
+        Backend->>Backend: Generate access token (30 min expiry)
+        Backend->>Backend: Generate refresh token (7 days expiry)
+        Backend->>Redis: Store refresh token (refresh:{user_id} = token, ttl=7d)
+        Backend-->>Client: access_token (JSON) + Set refresh_token cookie
+    else Invalid
+        Backend-->>Client: 401 Unauthorized
+    end
+```
+
+### Cookie Settings
+
+* **HttpOnly** – Prevents JavaScript access (XSS protection)
+* **Secure** – Sent only over HTTPS (set to `True` in production)
+* **SameSite = Lax** – Protects against CSRF
+* **Path = /** – Available for all endpoints
+
+**Rate Limiting:** `50 attempts per hour per email` on login.
+
+---
+
+## Refresh Token Flow (Automatic)
+
+When the access token expires, the frontend’s Axios interceptor automatically attempts a refresh.
+
+```mermaid
+sequenceDiagram
+    participant Client as React Client
+    participant Backend as FastAPI
+    participant Redis as Redis
+    participant DB as PostgreSQL
+
+    Client->>Backend: Request with expired access token
+    Backend-->>Client: 401 Unauthorized
+
+    Client->>Backend: POST /auth/refresh (no Authorization header)
+    Backend->>Backend: Read refresh_token from HttpOnly cookie
+    Backend->>Redis: GET refresh:{user_id}
+
+    alt Token matches
+        Backend->>DB: Fetch user (verify active & not suspended)
+        Backend->>Backend: Generate new access token
+        Backend-->>Client: new access_token
+        Client->>Backend: Retry original request with new token
+    else Token mismatch / expired
+        Backend-->>Client: 401 Unauthorized
+    end
+```
+
+> **Important:** The refresh token is **not rotated** — each user has a single valid refresh token. On logout, the token is deleted from Redis.
+
+---
+
+## Google OAuth Flow
+
+1. Frontend loads Google Identity Services (via `@react-oauth/google`)
+2. User clicks **Sign in with Google** — receives an ID token
+3. Frontend sends `POST /auth/google` with `{ token_str: "..." }`
+4. Backend verifies the token using Google’s public keys (via `google-auth`)
+5. If the email is new, a user is created with `is_verified=True`
+6. If the user exists, they are logged in
+7. JWT pair is generated and returned (refresh token in cookie)
+
+---
+
+## Logout
+
+`POST /auth/logout`
+
+1. Reads the refresh token from the cookie
+2. Deletes it from Redis (`refresh:{user_id}`)
+3. Clears the cookie on the client side
+
+The access token is **not explicitly revoked** — it expires after **30 minutes**.
+
+---
+
+## Redis Flow: OTP Storage & Rate Limiting
+
+```mermaid
+flowchart TD
+    subgraph OTP["OTP Storage"]
+        A[User requests OTP] --> B["Redis: SET otp:{email} = 123456"]
+        B --> C[TTL: 300 seconds]
+        C --> D["Verification: GET otp:{email}"]
+        D --> E{OTP matches?}
+        E -->|Yes| F["DELETE otp:{email}"]
+        E -->|No| G[Return error]
+    end
+```
+
+```mermaid
+flowchart TD
+    subgraph RateLimiting["Rate Limiting (Fixed Window)"]
+        H[User action] --> I["Redis: INCR rl:{key}"]
+        I --> J{First request?}
+        J -->|Yes| K["EXPIRE rl:{key} window_seconds"]
+        J -->|No| L[Check count]
+        L --> M{Count > limit?}
+        M -->|Yes| N[Block request]
+        M -->|No| O[Allow request]
+    end
+```
+
+### Rate-Limited Endpoints & Limits
+
+| Endpoint      | Key Pattern           | Limit | Window     |
+| ------------- | --------------------- | ----- | ---------- |
+| Registration  | `rl:reg:{email}`      | 50    | 1 hour     |
+| Login         | `rl:login:{email}`    | 50    | 1 hour     |
+| Resend OTP    | `rl:resend:{email}`   | 2     | 10 minutes |
+| Submit Report | `rl:report:{user_id}` | 5     | 5 minutes  |
+
+---
+
+## Security Measures Summary
+
+* **Password Hashing:** Argon2 (via `passlib`)
+* **JWT Signing:** HS256 with separate secrets for access and refresh tokens
+* **Token Expiry:** Short-lived access tokens minimise damage if compromised
+* **HttpOnly Cookies:** Refresh token cannot be stolen by XSS
+* **CORS:** Only trusted origins allowed
+* **Rate Limiting:** Protects against brute-force and abuse
+* **Suspension System:** Users can be temporarily suspended with automatic expiration
+* **WebSocket Eviction:** On suspension, all active WebSocket connections are forcibly closed
+
+---
+
+## Environment Variables Required
+
+| Variable                      | Purpose                             |
+| ----------------------------- | ----------------------------------- |
+| `SECRET_KEY`                  | Signing key for access tokens       |
+| `REFRESH_SECRET_KEY`          | Signing key for refresh tokens      |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | Access token TTL (default 30)       |
+| `REFRESH_TOKEN_EXPIRE_DAYS`   | Refresh token TTL (default 7)       |
+| `COOKIE_SECURE`               | Set to `True` in production (HTTPS) |
+| `REDIS_URL`                   | Connection string for Redis         |
+| `GOOGLE_CLIENT_ID`            | For Google OAuth verification       |
+| `SMTP_*`                      | Gmail SMTP settings for OTP emails  |
+
+---
+
+This authentication system is designed to be **secure by default** while providing a seamless user experience. All flows are fully implemented in code and ready for production use.

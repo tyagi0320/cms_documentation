@@ -1,0 +1,97 @@
+:root {
+  --ifm-color-primary: #2563eb;           
+  --ifm-color-primary-dark: #1d4ed8;
+  --ifm-color-primary-darker: #1e40af;
+  --ifm-color-primary-darkest: #1e3a8a;
+  --ifm-color-primary-light: #3b82f6;
+  --ifm-color-primary-lighter: #60a5fa;
+  --ifm-color-primary-lightest: #93c5fd;
+  --ifm-code-font-size: 90%;
+  --docusaurus-highlighted-code-line-bg: rgba(37, 99, 235, 0.06);
+
+  --ifm-background-color: #fcfcfd;         
+  --ifm-background-surface-color: #f1f5f9; 
+  --ifm-navbar-background-color: #f1f5f9;  
+  
+  --ifm-footer-background-color: #0f172a;  
+  --ifm-footer-color: #94a3b8;             
+  --ifm-footer-link-color: #38bdf8;        
+  
+  --ifm-font-color-base: #1e293b;          
+  --ifm-heading-color: #0f172a;         
+  --ifm-toc-link-color: #475569;          
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #a78bfa;            
+  --ifm-color-primary-dark: #8b5cf6;
+  --ifm-color-primary-darker: #7c3aed;
+  --ifm-color-primary-darkest: #6d28d9;
+  --ifm-color-primary-light: #c084fc;
+  --ifm-color-primary-lighter: #d8b4fe;
+  --ifm-color-primary-lightest: #f3e8ff;
+  --docusaurus-highlighted-code-line-bg: rgba(167, 139, 24a, 0.15);
+
+  /* Backgrounds & Canvas styling */
+  --ifm-background-color: #0b0f19;          
+  --ifm-background-surface-color: #111827;  
+  --ifm-navbar-background-color: #0b0f19;   
+  
+  /* Dark Mode Custom Footer Color */
+  --ifm-footer-background-color: #1e112a;  
+  --ifm-footer-color: #cbd5e1;             
+  --ifm-footer-link-color: #a78bfa;        
+  
+  /* Text & Border refinements */
+  --ifm-font-color-base: #cbd5e1;          
+  --ifm-heading-color: #f8fafc;           
+  --ifm-toc-link-color: #94a3b8;          
+}
+
+/* FOOTER STYLING OVERRIDES */
+.footer {
+  background-color: var(--ifm-footer-background-color);
+  color: var(--ifm-footer-color);
+}
+
+.footer__link-item {
+  color: var(--ifm-footer-link-color) !important;
+}
+
+.footer__link-item:hover {
+  text-decoration: underline;
+}
+
+/* LAYOUT POLISHERS */
+
+/* Remove default version badge active layouts */
+.navbar__item.navbar__link--active::after {
+  display: none;
+}
+
+/* Clean structural dividers */
+.navbar {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+[data-theme='dark'] .navbar {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* High-visibility clean search box */
+.navbar__search-input {
+  border-radius: 6px;                     
+  padding-left: 32px;
+  background-color: var(--ifm-background-color);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  color: var(--ifm-font-color-base);
+  transition: all 0.2s ease-in-out;
+}
+
+[data-theme='dark'] .navbar__search-input {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.navbar__search-input:focus {
+  border-color: var(--ifm-color-primary);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}

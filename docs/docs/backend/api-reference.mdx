@@ -1,0 +1,208 @@
+---
+title: API Guide
+sidebar_position: 7
+description: Complete REST API reference – endpoints, methods, authentication requirements, and brief descriptions.
+---
+
+## API Reference
+
+All API endpoints are served under the base path `/api/v1`.
+
+Authentication is required for most endpoints. The **Bearer token (JWT)** must be included in the `Authorization` header.
+
+---
+
+### Authentication (`/auth`)
+
+| Method | Endpoint | Auth | Description |
+| --- | --- | --- | --- |
+| `POST` | `/register` | ❌ | Register new user; sends OTP email |
+| `POST` | `/verify-otp` | ❌ | Verify OTP and activate account |
+| `POST` | `/resend-otp` | ❌ | Resend OTP (rate-limited) |
+| `POST` | `/login` | ❌ | Login; returns access token + sets refresh cookie |
+| `POST` | `/google` | ❌ | Google OAuth login |
+| `POST` | `/refresh` | ❌ | Refresh access token using HttpOnly cookie |
+| `POST` | `/logout` | ✅ | Logout; clears refresh cookie and Redis entry |
+| `GET` | `/me` | ✅ | Get current user profile |
+| `PATCH` | `/avatar` | ✅ | Update avatar (preset or URL) |
+| `POST` | `/avatar/upload` | ✅ | Upload custom avatar image |
+| `POST` | `/forgot-password` | ❌ | Send password reset OTP |
+| `POST` | `/reset-password` | ❌ | Reset password with OTP |
+
+### Posts (`/posts`)
+
+| Method | Endpoint | Auth | Description |
+| --- | --- | --- | --- |
+| `POST` | `/` | ✅ | Create a new post draft |
+| `GET` | `/published` | ✅ | Feed published posts with sorting (`latest`, `likes`, `comments`, `popular`) |
+| `GET` | `/my-published` | ✅ | User's published posts |
+| `GET` | `/my-drafts` | ✅ | User's draft posts |
+| `GET` | `/{post_id}` | ✅ | Get single post (cached) |
+| `PUT` | `/{post_id}` | ✅ | Update post (author only) |
+| `DELETE` | `/{post_id}` | ✅ | Hard delete (author only) |
+| `POST` | `/{post_id}/publish` | ✅ | Publish draft after template validation |
+| `PATCH` | `/{post_id}/unpublish` | ✅ | Move published post back to draft |
+
+
+### Templates (`/templates`)
+
+| Method | Endpoint | Auth | Description |
+| --- | --- | --- | --- |
+| `POST` | `/` | Admin only | Create template |
+| `GET` | `/` | ✅ | List all templates |
+| `GET` | `/{template_id}` | ✅ | Get template details |
+| `DELETE` | `/{template_id}` | Admin only | Delete template |
+
+
+### Taxonomy (`/taxonomy`)
+
+Categories and tags are managed here.
+
+| Method | Endpoint | Auth | Description |
+| --- | --- | --- | --- |
+| `POST` | `/categories` | Admin only | Create category |
+| `GET` | `/categories` | ✅ | List categories |
+| `DELETE` | `/categories/{category_id}` | Admin only | Delete category |
+| `POST` | `/tags` | ✅ | Create tag |
+| `GET` | `/tags` | ✅ | List tags |
+| `DELETE` | `/tags/{tag_id}` | Admin only | Delete tag |
+
+
+### Interactions (`/interactions`)
+
+Comments and likes.
+
+| Method | Endpoint | Auth | Description |
+| --- | --- | --- | --- |
+| `POST` | `/posts/{post_id}/comments` | ✅ | Add comment |
+| `GET` | `/posts/{post_id}/comments` | ✅ | Get comments (paginated) |
+| `DELETE` | `/comments/{comment_id}` | ✅ | Delete own comment |
+| `POST` | `/likes/toggle` | ✅ | Toggle like |
+
+
+### Media (`/media`)
+
+| Method | Endpoint | Auth | Description |
+| --- | --- | --- | --- |
+| `POST` | `/` | ✅ | Upload media to draft post |
+| `GET` | `/post/{post_id}` | ✅ | Get post media |
+| `GET` | `/` | ✅ | Get user's media |
+| `PUT` | `/{media_id}` | ✅ | Replace media file |
+| `DELETE` | `/{media_id}` | ✅ | Delete media |
+
+
+### Notifications (`/notifications`)
+
+| Method | Endpoint | Auth | Description |
+| --- | --- | --- | --- |
+| `WebSocket` | `/ws/{user_id}` | ✅ | Real-time notification socket |
+| `GET` | `/` | ✅ | Fetch notifications |
+| `PATCH` | `/{notification_id}/read` | ✅ | Mark notification as read |
+| `POST` | `/read-all` | ✅ | Mark all as read |
+
+
+### Admin (`/admin`)
+
+All endpoints require the **admin role**.
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/authors` | List authors |
+| `GET` | `/users` | List users |
+| `GET` | `/posts` | List posts |
+| `GET` | `/audit-logs` | Fetch audit logs |
+| `GET` | `/reports` | List reports |
+| `GET` | `/reports/content/{target_type}/{target_id}` | Get reported entity |
+| `PUT` | `/reports/{report_id}/dismiss` | Dismiss report |
+| `PUT` | `/reports/{report_id}/resolve` | Resolve report |
+| `PATCH` | `/posts/{post_id}/soft-delete` | Soft-delete post |
+| `DELETE` | `/posts/{post_id}/hard-delete` | Permanently delete post |
+| `PATCH` | `/posts/{post_id}/restore` | Restore post |
+| `DELETE` | `/comments/{comment_id}` | Delete any comment |
+| `POST` | `/users/{user_id}/suspend` | Suspend user |
+| `DELETE` | `/users/{user_id}` | Delete user |
+
+
+### RAG (`/rag`)
+
+| Method | Endpoint | Auth | Description |
+| --- | --- | --- | --- |
+| `POST` | `/{post_id}/summarize` | ✅ | Generate AI summary |
+| `POST` | `/{post_id}/ask` | ✅ | Ask questions about post |
+
+
+### Report (`/report`)
+
+| Method | Endpoint | Auth | Description |
+| --- | --- | --- | --- |
+| `POST` | `/` | ✅ | Submit report |
+| `GET` | `/report-status` | ✅ | Get report history |
+
+---
+
+## Status Codes & Error Format
+
+### Success Response
+
+```json
+{
+  "success": true,
+  "data": {},
+  "message": "Operation successful"
+}
+```
+
+### Error Response
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "AUTH_FAILED",
+    "message": "Invalid credentials"
+  }
+}
+```
+
+### Common HTTP Status Codes
+
+- `200` — OK
+- `201` — Created
+- `400` — Bad Request
+- `401` — Unauthorized
+- `403` — Forbidden
+- `404` — Not Found
+- `429` — Too Many Requests
+- `500` — Internal Server Error
+
+---
+
+## Pagination
+
+List endpoints such as feed, comments, and notifications support query parameters:
+
+- `skip` — Number of items to skip (default `0`)
+- `limit` — Number of items to return (default `10–20`)
+
+---
+
+## Authentication Headers
+
+### Access Token
+
+```http
+Authorization: Bearer <access_token>
+```
+
+### Refresh Token
+
+Refresh cookie is automatically sent by the browser when:
+
+```javascript
+withCredentials: true
+```
+
+---
+
+> **📘 Quick reference:** The backend auto-generates interactive OpenAPI documentation.  
+> For detailed request and response schemas, kindly refer to Swagger UI at `/docs`.

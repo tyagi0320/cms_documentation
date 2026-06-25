@@ -1,0 +1,128 @@
+---
+title: Backend Layering & API Request Lifecycle
+sidebar_position: 1
+description: How the FastAPI backend is structured into Router, Service, Repository, and ORM layers – with a complete trace of a Create Post request.
+---
+
+# Backend Layering & API Request Lifecycle
+
+The backend follows a strict **layered architecture**. This is not just a folder structure – it is **enforced** by dependency injection, clear separation of concerns, and a unidirectional data flow.
+
+## How Layering is Enforced
+
+| Layer | What it does | How it receives dependencies |
+|-------|--------------|------------------------------|
+| **Router** | Handles HTTP requests, validates input, returns responses | Receives `db: Session` and `user: User` via FastAPI `Depends`. Calls a **Service** to perform business logic. |
+| **Service** | Orchestrates business rules, workflows, and external calls (cache, notifications, email) | Is instantiated inside the router (or injected). Composes **Repository** objects internally. Receives `db` from the router and passes it down. |
+| **Repository** | Performs CRUD operations on the database using SQLAlchemy | Receives `db: Session` from the service. Does **not** know about HTTP or business rules. |
+| **ORM** | Maps Python objects to database tables | None – the ORM is used by the Repository to construct queries and manage relationships. |
+| **Database** | PostgreSQL – the actual persistence layer | None – the ORM communicates with it via SQLAlchemy engine. |
+
+**Key Rule**: Data flows **downwards**. A Router never talks directly to a Repository. A Service never handles HTTP concerns. This is what makes the code **testable** and **maintainable**.
+
+---
+
+## End‑to‑End Request Trace: 
+### Example: Create Post (`POST/posts`)
+
+The sequence diagram below traces a complete authenticated request from the React client all the way to the database and back. This is the **richest example** because it exercises all layers, including cache invalidation and notification dispatch.
+
+```mermaid
+sequenceDiagram
+    participant Client as React Client
+    participant FastAPI as FastAPI
+    participant Auth as AuthMiddleware
+    participant Router as Posts Router
+    participant Service as CMSService
+    participant Repo as CMSRepo
+    participant ORM as SQLAlchemy
+    participant DB as PostgreSQL
+    participant Cache as Redis
+    participant Notif as NotificationService
+
+    Client->>FastAPI: POST /posts (Bearer token, JSON payload)
+    FastAPI->>Auth: Validate JWT
+    Auth-->>FastAPI: Attach user to request.state
+    FastAPI->>Router: Route to create_post endpoint
+    Router->>Router: Extract user via Depends(get_current_user)
+    Router->>Service: create_post(db, data, user.id)
+
+    Service->>Service: Validate template exists
+    Service->>Service: Clean content (clean_content)
+    Service->>Service: Process dynamic tags (_process_dynamic_tags)
+
+    Service->>Repo: create_post(title, content, template_id, author_id, category_ids, tag_ids)
+    Repo->>ORM: Build Post object
+    ORM->>DB: INSERT posts
+    DB-->>ORM: Return post with UUID
+    ORM->>DB: INSERT post_categories & post_tags (many-to-many)
+    DB-->>ORM: Success
+    ORM-->>Repo: Return Post instance
+    Repo-->>Service: Return Post instance
+
+    Service->>Cache: Invalidate post cache (if any)
+    Service->>Notif: Send notification (if published)
+    Service-->>Router: Return serialised post
+    Router-->>Client: 201 Created (JSON response)
+    ```
+
+## Step-by-Step Breakdown
+
+1. **Client** → React application sends a `POST` request to `/api/v1/posts` with a `Bearer` access token and the post data (`title`, `content`, `template_id`, `categories`, `tags`).
+
+2. **FastAPI** → The request hits the FastAPI server. The **Authentication Middleware** (`AuthMiddleware`) intercepts the request, decodes the JWT, and attaches the `User` object to `request.state`.
+
+3. **Router** → The request is routed to the `create_post` endpoint in `posts.py`. The endpoint extracts the authenticated user via `Depends(get_current_user)`.
+
+4. **Service** → The router calls `CMSService.create_post()`, passing the database session, the payload, and the user ID.
+
+5. **Service Layer** – Inside the service:
+
+   * The template is validated (exists and schema is valid)
+   * The content is cleaned using `clean_content()` (adds UUIDs, trims text, removes empty structures)
+   * Dynamic tags are processed by `_process_dynamic_tags()` — tags are normalised (lowercase, stripped, `#` removed), and non-existent tags are created on the fly
+
+6. **Repository** → The service calls `CMSRepo.create_post()` with all the prepared data.
+
+7. **ORM** → The repository builds a `Post` SQLAlchemy instance, adds it to the session, and commits. The ORM generates the `INSERT` SQL for the `posts` table.
+
+8. **Database** → PostgreSQL executes the insert, returns the newly generated UUID, and the ORM populates the instance.
+
+9. **Many-to-Many** → The repository then adds relationships to `post_categories` and `post_tags` junction tables via `append()` operations, which generate additional `INSERT` statements.
+
+10. **Post-processing** → After the commit, the service invalidates any cached version of this post (if it existed) and, if the post status is `published`, triggers a notification to the author via `NotificationService`.
+
+11. **Response** → The service serialises the post (with categories, tags, and author details) and returns it to the router, which sends a `201 Created` response back to the client.
+
+---
+
+## Layers and Responsibilities
+
+| Layer          | Location                | Responsibility                                                                                 |
+| -------------- | ----------------------- | ---------------------------------------------------------------------------------------------- |
+| **Router**     | `app/api/v1/endpoints/` | Handles HTTP requests, extracts dependencies, invokes services, returns responses              |
+| **Service**    | `app/services/`         | Contains business logic — orchestrates repositories, external APIs, caching, and notifications |
+| **Repository** | `app/repository/`       | Data-access layer — performs CRUD operations using SQLAlchemy sessions                         |
+| **ORM**        | `app/models/`           | SQLAlchemy model definitions — map tables to Python objects and manage relationships           |
+| **Database**   | PostgreSQL              | The actual persistence layer                                                                   |
+
+---
+
+## Additional Layers and Cross-cutting Concerns
+
+* **Middleware** (`app/middleware/`) — Handles JWT validation before requests reach the router
+* **Dependencies** (`app/dependencies/`) — Provide reusable dependency injection (e.g., `get_current_user`, `admin_only`)
+* **Schemas** (`app/schemas/`) — Pydantic models for request validation and response serialisation
+* **Utilities** (`app/utils/`) — Helper modules for Redis, email, WebSocket, blob storage, content cleaning, etc.
+
+---
+
+## Why This Architecture?
+
+* **Testability** — Each layer can be unit-tested in isolation (services with mocked repositories, repositories with an in-memory DB)
+
+* **Maintainability** — Clear separation means changes in one layer (e.g., switching databases) do not affect other layers
+
+* **Flexibility** — Business logic is independent of the transport (HTTP) and persistence (SQL) layers
+
+* **Performance** — The repository layer can implement caching, bulk operations, and query optimisation without leaking into services

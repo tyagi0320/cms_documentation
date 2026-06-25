@@ -1,0 +1,125 @@
+---
+title: System Architecture
+sidebar_position: 1
+description: High‑level architecture of the CMS Platform – React frontend, FastAPI backend, PostgreSQL, Redis, WebSockets, Azure Blob, and RAG.
+---
+
+# System Architecture
+
+The CMS Platform is a modern, cloud‑native full‑stack application. It is designed to be **secure**, **scalable**, and **maintainable**, with a clear separation of concerns between the frontend, backend, data storage, and real‑time services.
+
+## High‑Level Architecture Diagram
+
+The following diagram illustrates the major components and their communication paths.
+
+```mermaid
+flowchart TB
+    subgraph Client["Client (Browser)"]
+        React["React SPA (TypeScript)"]
+        UI["Material UI Components"]
+        State["Context API + Services"]
+        API["Axios HTTP Client"]
+    end
+
+    subgraph Gateway["API Gateway & Middleware"]
+        FastAPI["FastAPI Server"]
+        AuthMiddleware["Authentication Middleware"]
+        CORSMiddleware["CORS Middleware"]
+    end
+
+    subgraph Services["Backend Services (Layered)"]
+        AuthService["Authentication Service"]
+        PostService["Post / CMS Service"]
+        InteractionService["Interaction Service (Likes/Comments)"]
+        MediaService["Media Service"]
+        ReportService["Report Service"]
+        AdminService["Admin Moderation Service"]
+        RAGService["RAG Service (AI)"]
+        NotificationService["Notification Service"]
+        AuditService["Audit Log Service"]
+    end
+
+    subgraph Data["Data & External Services"]
+        PostgreSQL[("PostgreSQL (Supabase)")]
+        Redis[("Redis Cache & Queues")]
+        Azure[("Azure Blob Storage")]
+        Groq[("Groq LLM API")]
+    end
+
+    subgraph Realtime["Real‑time"]
+        WebSocket[("WebSocket Server")]
+    end
+
+    React --> API
+    UI --> React
+    State --> React
+
+    API --> FastAPI
+    FastAPI --> AuthMiddleware
+    FastAPI --> CORSMiddleware
+    AuthMiddleware --> Services
+    CORSMiddleware --> Services
+
+    Services --> PostgreSQL
+    Services --> Redis
+    Services --> Azure
+    Services --> Groq
+    Services --> WebSocket
+
+    WebSocket --> React
+    ```
+    
+## Technology Stack
+
+| Layer | Technology | Purpose |
+|-------|------------|---------|
+| **Frontend** | React 19, TypeScript, Vite, MUI, dnd‑kit, TipTap, Axios | User interface, drag‑and‑drop builder, rich text editing, API communication |
+| **Backend** | Python 3.11, FastAPI, SQLAlchemy, Alembic, Pydantic | REST API, ORM, migrations, request validation |
+| **Database** | PostgreSQL (Supabase) | Primary data store (users, posts, comments, etc.) |
+| **Cache** | Redis | OTP storage, rate limiting, refresh tokens, post caching |
+| **File Storage** | Azure Blob Storage | Media uploads (images, videos, profile pictures) |
+| **AI / RAG** | SentenceTransformers, FAISS, Groq (Llama‑3.1) | Embeddings, vector search, summarization, Q&A |
+| **Real‑time** | WebSockets (FastAPI native) | Push notifications to connected clients |
+| **Authentication** | JWT (access/refresh), Argon2, Google OAuth | Secure user authentication and session management |
+| **Email** | SMTP (Gmail) | OTP delivery, password reset, notifications |
+
+---
+
+## Request Flow – End‑to‑End
+
+A typical authenticated request (e.g., `POST /posts`) follows this path:
+
+1. **Client** → Axios injects `Bearer <access_token>`.
+2. **FastAPI** → `AuthMiddleware` decodes the token and attaches the `User` object to `request.state`.
+3. **Router** → The endpoint receives the request, extracts the `user` via `Depends(get_current_user)`.
+4. **Service** → The business logic (e.g., `CMSService.create_post()`) orchestrates the operation.
+5. **Repository** → The service calls a repository (e.g., `CMSRepo.create_post()`) that performs SQLAlchemy operations.
+6. **ORM** → SQLAlchemy translates to SQL and executes against PostgreSQL.
+7. **Post‑processing** → Cache invalidations, notifications, and audit logs are triggered.
+8. **Response** → The result is serialised and returned to the client.
+
+This layered pattern ensures **testability**, **separation of concerns**, and **easy maintenance**.
+
+---
+
+## Key Architectural Decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| **Token Storage** | Access tokens stored **only in RAM** on the frontend; refresh tokens stored in **HttpOnly, Secure, SameSite cookies** to prevent XSS attacks. |
+| **Caching Strategy** | Post data is cached in Redis for 30 seconds to reduce database load for high‑traffic feeds. |
+| **Async & Performance** | FastAPI's async endpoints and asynchronous Redis operations ensure low latency. |
+| **Modular RAG** | The RAG pipeline is service‑based, allowing easy replacement of embedding models or vector stores. |
+| **Audit Trail** | All admin actions are logged in `admin_audit_logs` with full metadata for compliance. |
+| **Rate Limiting** | Redis‑based fixed‑window counters protect public endpoints from abuse (registration, login, OTP resend, reports). |
+
+---
+
+## Security Highlights
+
+-  Argon2 password hashing (via `passlib`).
+-  CORS restricted to trusted origins.
+-  Input validation using Pydantic with custom validators.
+-  Rate limiting on sensitive endpoints.
+-  Suspension system with automatic expiration.
+-  WebSocket eviction on account suspension.

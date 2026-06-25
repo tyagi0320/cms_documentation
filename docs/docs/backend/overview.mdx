@@ -1,0 +1,26 @@
+# Backend Overview
+
+## Technology Stack
+
+- **Python 3.11** with **FastAPI** (async)
+- **SQLAlchemy** ORM + **Alembic** for migrations
+- **PostgreSQL** – primary database
+- **Redis** – caching, rate limiting, OTP storage, refresh tokens
+- **Azure Blob Storage** – media files
+- **Groq API** + **SentenceTransformers** + **FAISS** – RAG features
+- **WebSocket** – real‑time notifications
+- **JWT** – access/refresh tokens (refresh stored in HttpOnly cookie)
+- **Google OAuth** – social login
+
+## Core Modules
+
+| Module | Path | Description |
+|--------|------|-------------|
+| **Core** | `app/core/` | Config, security (JWT, hashing) |
+| **Models** | `app/models/` | SQLAlchemy models (User, Post, Template, etc.) |
+| **Repository** | `app/repository/` | Data access layer (CRUD) |
+| **Services** | `app/services/` | Business logic (auth, cms, interaction, rag, etc.) |
+| **API Endpoints** | `app/api/v1/endpoints/` | Route handlers |
+| **Middleware** | `app/middleware/` | JWT authentication middleware |
+| **Utils** | `app/utils/` | Email, Redis client, WebSocket manager, Blob helpers |
+| **Schemas** | `app/schemas/` | Pydantic request/response models |

@@ -1,0 +1,153 @@
+---
+title: Project Overview
+sidebar_position: 1
+description: Comprehensive documentation for the CMS Platform – a full-stack Content Management System built with React, FastAPI, and PostgreSQL.
+---
+
+# Welcome to the CMS Platform Documentation
+
+Welcome to the CMS Platform — a modern, full-stack content management system designed for creators, teams, and enterprises. This documentation covers everything you need to understand, extend, and deploy the platform.
+
+---
+
+## What is the CMS Platform?
+
+The CMS Platform is a production-ready solution for building and managing digital content. It combines a visual drag-and-drop editor with AI-powered features, live notifications, and enterprise-grade moderation.
+
+---
+
+## Core Capabilities
+
+| Feature | Description |
+| --- | --- |
+| Visual Post Builder | Drag-and-drop sections, columns, and blocks (Text, Image, Video) with template-driven structure |
+| Media Management | Upload and manage images/videos via Azure Blob Storage |
+| AI-Powered RAG | Summarize posts and ask natural-language questions using embeddings and LLMs |
+| Live Notifications | Instant alerts for likes, comments, and admin actions via WebSockets |
+| Admin Moderation | Reports, audit logs, suspension, and compliance tooling |
+| Secure Authentication | JWT, refresh tokens, OTP verification, Google OAuth |
+
+---
+
+## Technology Stack
+
+The platform is built using modern production-grade technologies.
+
+| Layer | Primary Technologies |
+| --- | --- |
+| Frontend | React 19, TypeScript, Vite, Material UI, dnd-kit, TipTap, Axios |
+| Backend | Python 3.11, FastAPI, SQLAlchemy, Alembic, Pydantic |
+| Database | PostgreSQL (via Supabase) |
+| Cache | Redis (OTP, rate limiting, sessions, caching) |
+| Storage | Azure Blob Storage |
+| AI / RAG | SentenceTransformers, FAISS, Groq (Llama 3.1) |
+| Live Communication | WebSockets |
+
+---
+
+## How to Navigate This Documentation
+
+This documentation is organized to serve different audiences.
+
+### For Architects & Engineers
+Start with:
+
+- System Architecture
+- Backend Layering
+
+### For Developers
+Explore:
+
+- API Reference
+- Frontend Components
+- State Management
+
+### For Administrators
+Review:
+
+- Admin Moderation
+- Azure Storage
+- Security
+
+### For Interviewers & Managers
+Read:
+
+- Architecture Overview
+- Database Models
+- Design Decisions
+
+---
+
+## Quick Links
+
+- [Architecture Overview](docs/architecture/overview.mdx) — System components and data flow
+- [Authentication & Security](docs/backend/authentication.mdx) — Authentication, authorization, and token security
+- [API Reference](docs/backend/api-reference.mdx) — REST endpoints
+- [Post Builder & Components](frontend/components#post-builder-cms) — UI architecture
+- [RAG Pipeline](docs/backend/rag.mdx) — AI summarization and Q&A
+- [Deployment Guide](docs/deployment.mdx) — Production deployment
+
+---
+
+## Key Design Principles
+
+The CMS Platform is built around the following principles.
+
+### Security First
+
+- Access tokens stored in RAM
+- Refresh tokens stored in HttpOnly cookies
+- Argon2 password hashing
+- Rate limiting via Redis
+
+### Layered Architecture
+
+Clear separation of concerns:
+
+```text
+Router → Service → Repository → ORM / Database
+```
+
+### User-Centric UX
+
+- Intuitive drag-and-drop editing
+- Responsive design
+- Fast feedback via live notifications
+
+### Extensibility
+
+Modular services and repositories enable easy customization.
+
+### Observability
+
+Comprehensive audit logging supports debugging and compliance.
+
+---
+
+## Getting Started (Development)
+
+To run the platform locally:
+
+1. Clone the repository
+2. Configure environment variables (`.env`)
+3. Start backend services
+4. Run database migrations
+5. Launch frontend development server
+
+Detailed setup instructions are available in the **Deployment Guide**.
+
+---
+
+## License
+
+This project is proprietary and confidential. All rights reserved.
+
+---
+
+## Next Steps
+
+- 📖 Read [Architecture](docs/architecture/overview.mdx) to understand the system
+- 🧑‍💻 Explore [Backend](docs/backend/architecture.mdx) and [Frontend](docs/frontend/overview.mdx)
+- 🚀 Follow the [Deployment Guide](docs/deployment.mdx)
+
+We hope this documentation helps you understand and extend the CMS Platform effectively. If you have questions or suggestions, feel free to open an issue or contact the team.
