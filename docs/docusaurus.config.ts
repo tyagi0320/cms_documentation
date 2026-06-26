@@ -132,6 +132,10 @@ const config: Config = {
               label: 'ChitwanRana',
               href: 'https://github.com/ChitwanRana',
             },
+             {
+              label: 'HarshitTyagi',
+              href: 'https://github.com/tyagi0320',
+            },
           ],
         },
       ],
